@@ -6,15 +6,12 @@ Packages like [sgkit](https://pystatgen.github.io/sgkit/) and [scikit-allel](htt
 
 All functionality currently runs locally, with planned extensions for parallel computation on **Dask clusters** managed by **SLURM** or **Kubernetes**.
 
---
-
 ## Naming
 
 > *Cairns* are piles of rocks, often left on ridges or mountaintops to guide walkers.  
-> Passers-by add a stone as they pass.  
+> Passersby add a stone as they pass.  
 > Likewise, this library is a small stack of utilities — pragmatic additions on top of the excellent Python population-genomics ecosystem.
 
---
 
 ## Installation
 
