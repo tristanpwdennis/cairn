@@ -1,8 +1,28 @@
 # cairn
-Cairn: A collection of utility functions for loading, querying, and analysing Zarr arrays of genomic data.
 
-Cairns are piles of rocks, typically left on the tops of mountains or ridges to provide guidance for walkers. Passersby will often throw a rock on top.
+**cairn** is a collection of utility functions for loading, querying, and analysing Zarr arrays of genomic data.
 
-This is a collection of utility functions for analysing genomic zarr arrays of genomic data. The hard work is done by scikit-allel and sgkit, but I found myself rewriting a ton of code for each project when I needed to access, query, subset and perform various analyses. Every time I think of something, I toss a new rock on the cairn. 
+Packages like [sgkit](https://pystatgen.github.io/sgkit/) and [scikit-allel](https://scikit-allel.readthedocs.io/) provide excellent functionality for genome analysis. *Cairn* adds lightweight utilities and convenience wrappers for my own workflows — typically involving large Zarr arrays of genotype and variant data.
 
-As you can see, I'm fairly determined to keep true to the metaphor.
+All functionality currently runs locally, with planned extensions for parallel computation on **Dask clusters** managed by **SLURM** or **Kubernetes**.
+
+--
+
+## Naming
+
+> *Cairns* are piles of rocks, often left on ridges or mountaintops to guide walkers.  
+> Passers-by add a stone as they pass.  
+> Likewise, this library is a small stack of utilities — pragmatic additions on top of the excellent Python population-genomics ecosystem.
+
+--
+
+## Installation
+
+```bash
+git clone https://github.com/tristanpwdennis/cairn.git
+cd cairn
+pip install -e .
+
+For development:
+
+pip install -e ".[dev]"
