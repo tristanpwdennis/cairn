@@ -8,9 +8,9 @@ All functionality currently runs locally, with planned extensions for parallel c
 
 ## Naming
 
-> *Cairns* are piles of rocks, often left on ridges or mountaintops to guide walkers.  
-> Passersby add a stone as they pass.  
-> Likewise, this library is a small stack of utilities — pragmatic additions on top of the excellent Python population-genomics ecosystem.
+- *Cairns* are piles of rocks, often left on ridges or mountaintops to guide walkers.  
+- Passersby add a stone as they pass.  
+- Likewise, this library is a small stack of utilities — pragmatic additions on top of the excellent Python population-genomics ecosystem.
 
 
 ## Installation
