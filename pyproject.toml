@@ -1,29 +1,74 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "cairn"
-version = "0.1.0"
-description = "A toolkit for accessing and analysing Zarr arrays of genomic data"
-authors = [
-    {name="Tristan Dennis", email="tristanpwdennis@gmail.com"}
-]
+version = "0.0.0"
+description = "Utility functions for loading, querying, and analysing Zarr arrays of genomic data."
 readme = "README.md"
-requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "Tristan Dennis" }
+]
+requires-python = ">=3.11"
 dependencies = [
-    "scikit-allel",
-    "numpy",
-    "pandas",
-    "zarr",
-    "plotly",
-    "seaborn",
-    "dask",
-    "cartopy",
-    "xarray",
-    "sgkit",
-    "matplotlib"
+  "scikit-allel",
+  "anjl",
+  "zarr",
+  "xarray",
+  "plotly",
+  "seaborn",
+  "numpy",
+  "pandas",
+  "scipy",
+  "tqdm",
+  "scikit-bio"
 ]
 
-[tool.setuptools.packages.find]
-where = ["."]
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "black",
+  "ruff",
+  "mypy",
+  "pre-commit"
+]
+
+[project.urls]
+Homepage = "https://github.com/<your-username>/cairn"
+Issues = "https://github.com/<your-username>/cairn/issues"
+
+# Tool configs
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | build
+  | dist
+)/
+'''
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "W", "C90", "B", "A"]
+ignore = ["E501"]  # long lines allowed since Black handles formatting
+target-version = "py311"
+
+[tool.mypy]
+python_version = 3.11
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
