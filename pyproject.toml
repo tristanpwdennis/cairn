@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cairn"
-version = "0.0.0"
+version = "0.1.0"
 description = "Utility functions for loading, querying, and analysing Zarr arrays of genomic data."
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
-  { name = "Tristan Dennis" }
+  { name = "Tristan Dennis; tristanpwdennis@gmail.com" }
 ]
 requires-python = ">=3.11"
 dependencies = [
@@ -36,8 +36,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/<your-username>/cairn"
-Issues = "https://github.com/<your-username>/cairn/issues"
+Homepage = "https://github.com/tristanpwdennis/cairn"
+Issues = "https://github.com/tristanpwdennis/cairn/issues"
 
 # Tool configs
 
