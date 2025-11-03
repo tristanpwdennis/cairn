@@ -1,4 +1,4 @@
-data_source: local  # or "gcs"
+data_source: local  
 
 sources:
   local:
