@@ -135,7 +135,6 @@ def _locate_region(region: tuple, pos: np.ndarray) -> slice:
     return loc_region
 
 
-# Define helper functions
 def load_genotype_array(
     zarr_base_path: str,
     region: str,
@@ -176,7 +175,7 @@ def load_genotype_array(
 
     Raises
     ------
-    # Error if the data aren't found or the queries are insensible.
+    # Errors if the GT and POS arrays are mismatched, if there aren't enough SNPs after filtering to downsample, or if the range queries are insensible.
 
     Examples
     --------
