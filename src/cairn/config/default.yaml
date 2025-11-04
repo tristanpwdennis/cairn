@@ -1,4 +1,4 @@
-data_source: local  
+data_source: local
 
 sources:
   local:

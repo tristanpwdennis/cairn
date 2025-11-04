@@ -6,10 +6,16 @@ Packages like [sgkit](https://pystatgen.github.io/sgkit/) and [scikit-allel](htt
 
 All functionality currently runs locally, with planned extensions for parallel computation on **Dask clusters** managed by **SLURM** or **Kubernetes**.
 
+TO-DO:
+- Add support for GCS.
+- " Dask.
+- Add spinners for everything. I love spinners.
+
+
 ## Naming
 
-- *Cairns* are piles of rocks, often left on ridges or mountaintops to guide walkers.  
-- Passersby add a stone as they pass.  
+- *Cairns* are piles of rocks, often left on ridges or mountaintops to guide walkers.
+- Passersby add a stone as they pass.
 - Likewise, this library is a small stack of utilities — pragmatic additions on top of the excellent Python population-genomics ecosystem.
 
 
