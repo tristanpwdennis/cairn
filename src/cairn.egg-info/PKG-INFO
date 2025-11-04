@@ -1,0 +1,55 @@
+Metadata-Version: 2.4
+Name: cairn
+Version: 0.1.0
+Summary: Utility functions for loading, querying, and analysing Zarr arrays of genomic data.
+Author: Tristan Dennis; tristanpwdennis@gmail.com
+License: MIT
+Project-URL: Homepage, https://github.com/tristanpwdennis/cairn
+Project-URL: Issues, https://github.com/tristanpwdennis/cairn/issues
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: scikit-allel
+Requires-Dist: anjl
+Requires-Dist: zarr
+Requires-Dist: xarray
+Requires-Dist: plotly
+Requires-Dist: seaborn
+Requires-Dist: numpy
+Requires-Dist: pandas
+Requires-Dist: google
+Requires-Dist: gcsfs
+Requires-Dist: scipy
+Requires-Dist: tqdm
+Requires-Dist: scikit-bio
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: black; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+Requires-Dist: pre-commit; extra == "dev"
+
+# cairn
+
+**cairn** is a collection of utility functions for loading, querying, and analysing Zarr arrays of genomic data.
+
+Packages like [sgkit](https://pystatgen.github.io/sgkit/) and [scikit-allel](https://scikit-allel.readthedocs.io/) provide excellent functionality for genome analysis. *Cairn* adds lightweight utilities and convenience wrappers for my own workflows — typically involving large Zarr arrays of genotype and variant data.
+
+All functionality currently runs locally, with planned extensions for parallel computation on **Dask clusters** managed by **SLURM** or **Kubernetes**.
+
+## Naming
+
+- *Cairns* are piles of rocks, often left on ridges or mountaintops to guide walkers.
+- Passersby add a stone as they pass.
+- Likewise, this library is a small stack of utilities — pragmatic additions on top of the excellent Python population-genomics ecosystem.
+
+
+## Installation
+
+```bash
+git clone https://github.com/tristanpwdennis/cairn.git
+cd cairn
+pip install -e .
+
+For development:
+
+pip install -e ".[dev]"

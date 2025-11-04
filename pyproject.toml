@@ -43,32 +43,11 @@ Issues = "https://github.com/tristanpwdennis/cairn/issues"
 
 # Tool configs
 
-[tool.black]
-line-length = 88
-target-version = ["py311"]
-exclude = '''
-/(
-    \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | _build
-  | build
-  | dist
-)/
-'''
-
 [tool.ruff]
 line-length = 88
 select = ["E", "F", "W", "C90", "B", "A"]
 ignore = ["E501"]  # long lines allowed since Black handles formatting
 target-version = "py311"
-
-[tool.mypy]
-python_version = 3.11
-strict = true
-ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "7.0"

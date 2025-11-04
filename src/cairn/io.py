@@ -11,50 +11,17 @@ for extracting and subsetting genotype data from Zarr arrays.
 
 from __future__ import annotations
 
-import json
-import logging
-from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Union
 
 import allel
 import pandas as pd
 import numpy as np
-import xarray as xr
 import zarr
-
-
-import numpy as np
-from typing import Union
-
 
 
 # To-Do
 # - Add region support
 # - Add gcs support
-
-def _locate_region(region: tuple,  # Parse this
-                  pos: np.ndarray) -> slice:
-    """Get array slice and a parsed genomic region.
-
-    Parameters
-    ----------
-    region : Region
-        The region to locate.
-    pos : array-like
-        Positions to be searched.
-
-    Returns
-    -------
-    loc_region : slice
-
-    """
-    pos_idx = allel.SortedIndex(pos)
-    try:
-        loc_region = pos_idx.locate_range(region.start, region.end)
-    except KeyError:
-        # There are no data within the requested region, return a zero-length slice.
-        loc_region = slice(0, 0)
-    return loc_region
 
 
 def _select_random_elements_sorted(
@@ -110,33 +77,37 @@ def _parse_region(region_str: str) -> tuple:
     chrom = region_str
     start = end = None
 
-
     # If contains colon, split into chrom and coords and strip whitespace
-    if ':' in region_str:
-        chrom_part, coords = region_str.split(':', 1)
+    if ":" in region_str:
+        chrom_part, coords = region_str.split(":", 1)
         chrom = chrom_part.strip()
 
         # Cmomplain if the coords aren't formatted correctly
-        if '-' not in coords:
+        if "-" not in coords:
             raise ValueError(
                 f"Region must include both start and end positions, e.g. '2RL:1000-2000', got '{region_str}'"
             )
 
         # Strip whitespace again
-        start_str, end_str = coords.split('-', 1)
+        start_str, end_str = coords.split("-", 1)
 
         # Remove any commas from numbers. If the numbers aren't integers, complain.
         try:
-            start = int(start_str.replace(',', '').strip())
-            end = int(end_str.replace(',', '').strip())
-        except ValueError:
-            raise ValueError(f"Start and end positions must be integers, got '{coords}'")
+            start = int(start_str.replace(",", "").strip())
+            end = int(end_str.replace(",", "").strip())
+        except ValueError as err:
+            raise ValueError(
+                f"Start and end positions must be integers, got '{coords}'"
+            ) from err
 
         # Make sure that the start and end are oriented correctly
         if start >= end:
-            raise ValueError(f"Start position must be less than end position in '{region_str}'")
+            raise ValueError(
+                f"Start position must be less than end position in '{region_str}'"
+            )
 
-    return(chrom, start, end) # Return parsed region
+    return (chrom, start, end)  # Return parsed region
+
 
 def _locate_region(region: tuple, pos: np.ndarray) -> slice:
     """Get array slice and a parsed genomic region.
@@ -155,25 +126,27 @@ def _locate_region(region: tuple, pos: np.ndarray) -> slice:
     """
     pos_idx = allel.SortedIndex(pos)
     try:
-        loc_region = pos_idx.locate_range(region[1], region[2]) # use start and end (1st and 2nd elements of the region tuple)
+        loc_region = pos_idx.locate_range(
+            region[1], region[2]
+        )  # use start and end (1st and 2nd elements of the region tuple)
     except KeyError:
         # There are no data within the requested region, return a zero-length slice.
         loc_region = slice(0, 0)
     return loc_region
 
+
 # Define helper functions
 def load_genotype_array(
-    zarr_base_path : str, 
-    region: str, 
-    df_samples: pd.DataFrame, 
-    genotype_var = "calldata/GT",
-    pos_var = "variants/POS",
-    thin_offset : int = 0,
+    zarr_base_path: str,
+    region: str,
+    df_samples: pd.DataFrame,
+    genotype_var="calldata/GT",
+    pos_var="variants/POS",
+    thin_offset: int = 0,
     n_snps: int = None,
-    sample_query: str = None, 
-    filter_mask : str = None,
-    ) -> allel.GenotypeArray:
-
+    sample_query: str = None,
+    filter_mask: str = None,
+) -> allel.GenotypeArray:
     """
     Load of genotypes from a zarr store. Optionally apply queries, randomly downsample, or select a range. Returns a scikit-allel GenotypeArray.
 
@@ -200,14 +173,14 @@ def load_genotype_array(
     Returns
     -------
     allel.GenotypeArray (n_sites, n_samples, n_ploidy)
-    
+
     Raises
     ------
     # Error if the data aren't found or the queries are insensible.
 
     Examples
     --------
-    >>> 
+    >>>
     >>>
     >>>
     """
@@ -222,8 +195,8 @@ def load_genotype_array(
 
     # Subset by query, if applicable
     if sample_query is not None:
-         bool_query = np.array(df_samples.eval(sample_query))
-         gt = gt.compress(bool_query, axis=1)
+        bool_query = np.array(df_samples.eval(sample_query))
+        gt = gt.compress(bool_query, axis=1)
 
     # Subset to range if coordinates are passed in the region
     if region[2] is not None and region[1] is not None:
@@ -233,17 +206,15 @@ def load_genotype_array(
             raise Exception("Conflicting GT and POS array lengths")
         gt = gt[posx]
 
-
     # Apply filter mask
     if filter_mask is not None:
-        flt = z[f"{filter_mask}"] # Load mask
-        if posx is not None: # Filter by position if applicable
-            flt = flt[posx] 
+        flt = z[f"{filter_mask}"]  # Load mask
+        if posx is not None:  # Filter by position if applicable
+            flt = flt[posx]
         gt = gt.compress(flt, axis=0)
-    
+
     # Thin
     if n_snps is not None:
-
         # Try to meet target number of SNPs.
         if gt.shape[0] > (n_snps):
             # Apply thinning.
@@ -254,4 +225,4 @@ def load_genotype_array(
         elif gt.shape[0] < n_snps:
             raise ValueError("Not enough SNPs.")
 
-    return(gt)
+    return gt
