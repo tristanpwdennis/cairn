@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 
-from cairn.io import load_genotype_array, _select_random_elements_sorted
+from cairn.io import load_biallelic_snp_calls
 
 from typing import Union
 
@@ -46,6 +46,7 @@ def run_pca(
     cache_path: str = os.getcwd(),
     n_components: int = 10,
     min_minor_ac: Union[int, float] = 1,
+    max_missing_an: int = 1,
     thin_offset: int = 0,
     n_snps: int = None,
     sample_query: str = None,
@@ -76,7 +77,9 @@ def run_pca(
     is_segregating: bool
         Toggle whether to select segregating only sites. Optional. Defaults to True.
     min_minor_ac: int / float.
-        Filter on minor allele count. If float, will filter on frequency (fraction). Defaults to 1. Optional.
+        Filter on minor allele count. If float, will filter on frequency (fraction). Defaults to 1.
+    max_missing_an: int
+        Min number of missing individuals at a given site. Defaults to 1.
     thin_offset: int
         Starting index for SNP thinning. Change this to repeat the analysis using a different set of SNPs. Optional.
     sample_query : str
@@ -128,26 +131,19 @@ def run_pca(
 
     # Prepare inputs
     with yaspin("Preparing input matrix..."):
-        g = load_genotype_array(
+        g = load_biallelic_snp_calls(
             zarr_base_path=zarr_base_path,
             region=region,
             df_samples=df_samples,
             genotype_var=genotype_var,
             pos_var=pos_var,
             sample_query=sample_query,
+            min_minor_ac=min_minor_ac,
+            max_missing_an=max_missing_an,
+            n_snps=n_snps,
             filter_mask=filter_mask,
         )
 
-        ac = g.count_alleles()  # Count alleles
-        flt = (ac.max_allele() == 1) & (
-            ac[:, :2].min(axis=1) > 1
-        )  # Remove singletons and multiallelics
-        gf = g.compress(flt, axis=0)  # Apply filter
-
-        gn = _select_random_elements_sorted(
-            gf, n_snps
-        ).to_n_alt()  # Select random n snps
-        # Convert to n alt alleles
         gn = g.to_n_alt()
 
     # Subset sample df
@@ -168,6 +164,7 @@ def run_pca(
 
         # Save output
         evr = model.explained_variance_ratio_
+        os.makedirs(os.path.dirname(data_path), exist_ok=True)
         data.to_csv(data_path, index=False)
         np.save(evr_path, evr)
         print(f"saved results: {results_key}")

@@ -20,122 +20,11 @@ import zarr
 
 from yaspin import yaspin
 
-from cairn.frq import compute_ac
+from cairn.utils import locate_region, parse_region
 
 
 # To-Do
 # - Add gcs support
-
-
-def _select_random_elements_sorted(
-    arr: Union[np.ndarray],
-    n: int,
-    replace: bool = False,
-    seed: int | None = None,
-    return_indices: bool = False,
-):
-    """
-    Select random rows from a 2D array (or xarray), returned in sorted order.
-
-    Parameters
-    ----------
-    arr : array-like of shape (n_rows, n_features)
-        Input array or matrix from which to sample rows.
-    n : int
-        Number of rows to select.
-    replace : bool, optional
-        Whether to sample with replacement. Default is False.
-    seed : int, optional
-        Random seed for reproducibility. Default is None.
-    return_indices : bool, optional
-        If True, also return the selected indices. Default is False.
-    """
-
-    rng = np.random.default_rng(seed)
-    n_rows = arr.shape[0]
-
-    if not replace and n > n_rows:
-        raise ValueError(
-            f"Cannot sample {n} rows without replacement from {n_rows} total."
-        )
-
-    indices = np.sort(rng.choice(n_rows, size=n, replace=replace))
-
-    sampled = arr[indices]
-    return (sampled, indices) if return_indices else sampled
-
-
-def _parse_region(region_str: str) -> tuple:
-    """
-    Parse a genomic region string of the form 'chrom', or 'chrom:start-end'.
-
-    Examples
-    --------
-    'CM023248' -> ('CM023248', None, None)
-    'CM023248:1000' -> ('CM023248', 1000, None)
-    'CM023248:1000-2000' -> ('CM023248', 1000, 2000)
-    """
-    # Strip whitespace
-    region_str = region_str.strip()
-    chrom = region_str
-    start = end = None
-
-    # If contains colon, split into chrom and coords and strip whitespace
-    if ":" in region_str:
-        chrom_part, coords = region_str.split(":", 1)
-        chrom = chrom_part.strip()
-
-        # Cmomplain if the coords aren't formatted correctly
-        if "-" not in coords:
-            raise ValueError(
-                f"Region must include both start and end positions, e.g. '2RL:1000-2000', got '{region_str}'"
-            )
-
-        # Strip whitespace again
-        start_str, end_str = coords.split("-", 1)
-
-        # Remove any commas from numbers. If the numbers aren't integers, complain.
-        try:
-            start = int(start_str.replace(",", "").strip())
-            end = int(end_str.replace(",", "").strip())
-        except ValueError as err:
-            raise ValueError(
-                f"Start and end positions must be integers, got '{coords}'"
-            ) from err
-
-        # Make sure that the start and end are oriented correctly
-        if start >= end:
-            raise ValueError(
-                f"Start position must be less than end position in '{region_str}'"
-            )
-
-    return (chrom, start, end)  # Return parsed region
-
-
-def _locate_region(region: tuple, pos: np.ndarray) -> slice:
-    """Get array slice and a parsed genomic region.
-
-    Parameters
-    ----------
-    region : Region
-        The region to locate.
-    pos : array-like
-        Positions to be searched.
-
-    Returns
-    -------
-    loc_region : slice
-
-    """
-    pos_idx = allel.SortedIndex(pos)
-    try:
-        loc_region = pos_idx.locate_range(
-            region[1], region[2]
-        )  # use start and end (1st and 2nd elements of the region tuple)
-    except KeyError:
-        # There are no data within the requested region, return a zero-length slice.
-        loc_region = slice(0, 0)
-    return loc_region
 
 
 @yaspin(text="Loading genotypes...")
@@ -151,7 +40,7 @@ def load_genotype_array(
     filter_mask: str = None,
 ) -> allel.GenotypeArray:
     """
-    Load of genotypes from a zarr store. Optionally apply queries, randomly downsample, or select a range. Returns a scikit-allel GenotypeArray.
+    Load genotypes from a zarr store. Optionally apply queries, randomly downsample, or select a range. Returns a scikit-allel GenotypeArray.
 
     Parameters
     ----------
@@ -188,7 +77,7 @@ def load_genotype_array(
     >>>
     """
     # Parse region
-    genome_location = _parse_region(region)
+    genome_location = parse_region(region)
 
     # Open zarr
     z = zarr.open(zarr_base_path.format(contig=genome_location[0]))
@@ -204,7 +93,7 @@ def load_genotype_array(
     # Subset to range if coordinates are passed in the region
     if region[2] is not None and region[1] is not None:
         pos = z[f"{pos_var}"]
-        posx = _locate_region(region=genome_location, pos=pos)
+        posx = locate_region(region=genome_location, pos=pos)
         if gt[posx].shape[0] != pos[posx].shape[0]:
             raise Exception("Conflicting GT and POS array lengths")
         gt = gt[posx]
@@ -231,7 +120,121 @@ def load_genotype_array(
     return gt
 
 
-@yaspin(text="Loading biallelic SNP calls...")
+@yaspin(text="Computing allele counts...")
+def compute_ac(
+    zarr_base_path: str,
+    region: str,
+    df_samples: pd.DataFrame,
+    genotype_var: str = "calldata/GT",
+    pos_var: str = "variants/POS",
+    is_biallelic: bool = True,
+    is_segregating: bool = True,
+    min_minor_ac: Union[int, float] = 1,
+    thin_offset: int = 0,
+    n_snps: int = None,
+    sample_query: str = None,
+    filter_mask: str = None,
+) -> allel.AlleleCountsArray:
+    """
+    Compute allele counts. Subset by region. Optionally apply queries, randomly downsample, or select a range. Returns a scikit-allel AlleleCountsArray.
+
+    Parameters
+    ----------
+    zarr_base_path : str
+        Path to input zarr store.
+    region : str
+        Genomic region to select. Can be a whole contig (e.g. 2RL), or a region (e.g. 2RL:1000-2000). Regions must be in the format <contig>:<start>-<end>.
+    df_samples : pandas DataFrame
+        Sample metadata.
+    genotype_var : str
+        Path to the genotype data within the zarr store.
+    pos_var : str
+        Path to the variant position within the zarr store. Defaults to 'variants/POS'.
+    is_biallelic: bool
+        Toggle whether to select biallelic only sites. Optional. Defaults to True.
+    is_segregating: bool
+        Toggle whether to select segregating only sites. Optional. Defaults to True.
+    min_minor_ac: int / float.
+        Filter on minor allele count. If float, will filter on frequency (fraction). Defaults to 1. Optional.
+    thin_offset: int
+        Starting index for SNP thinning. Change this to repeat the analysis using a different set of SNPs. Optional.
+    sample_query : str
+        Pandas-style query statement to subset samples. Optional.
+    n_snps : int
+        Randomly downsample variants to this value. Optional.
+    filter_mask : str
+        Path of a boolean filter mask variable in the zarr store. Optional.
+    Returns
+    -------
+    allel.AlleleCountsArray (n_sites, n_ploidy)
+
+    Raises
+    ------
+    # Errors if the GT and POS arrays are mismatched, if there aren't enough SNPs after filtering to downsample, or if the range queries are insensible.
+
+    Examples
+    --------
+    >>>
+    >>>
+    >>>
+    """
+
+    g = load_genotype_array(
+        zarr_base_path=zarr_base_path,
+        region=region,
+        df_samples=df_samples,
+        genotype_var=genotype_var,
+        pos_var=pos_var,
+        filter_mask=filter_mask,
+        thin_offset=thin_offset,
+        sample_query=sample_query,
+    )
+
+    ac = g.count_alleles()
+
+    mask = None  # Start with initial mask of none, then build filter mask as optional conditions are applied.
+
+    # Apply biallelic filter
+    if is_biallelic is not None:
+        biallelic_mask = ac.is_biallelic()
+        mask = biallelic_mask if mask is None else mask & biallelic_mask
+
+    # Apply segregating filter
+    if is_segregating is not None:
+        segregating_mask = ac.is_segregating()
+        mask = segregating_mask if mask is None else mask & segregating_mask
+
+    # Apply minor allele count filter
+    if min_minor_ac is not None:
+        an = ac.sum(axis=1)
+        # Apply minor allele count condition.
+        ac_minor = ac[:, 1:].sum(axis=1)
+        if isinstance(min_minor_ac, float):
+            ac_minor_frac = ac_minor / an
+            loc_minor_mask = ac_minor_frac >= min_minor_ac
+        else:
+            loc_minor_mask = ac_minor >= min_minor_ac
+        mask = loc_minor_mask if mask is None else mask & loc_minor_mask
+
+    # Apply all filters at once
+    if mask is not None:
+        gt = g.compress(mask)
+
+    # Thin
+    if n_snps is not None:
+        # Try to meet target number of SNPs.
+        if gt.shape[0] > (n_snps):
+            # Apply thinning.
+            thin_step = gt.shape[0] // n_snps
+            loc_thin = slice(thin_offset, None, thin_step)
+            gt = gt[loc_thin]
+
+        elif gt.shape[0] < n_snps:
+            raise ValueError("Not enough SNPs.")
+
+    return gt.count_alleles()
+
+
 def load_biallelic_snp_calls(
     zarr_base_path: str,
     region: str,
@@ -247,19 +250,6 @@ def load_biallelic_snp_calls(
 ):
     """ """
 
-    # Load allele counts
-    ac = compute_ac(
-        zarr_base_path=zarr_base_path,
-        region=region,
-        df_samples=df_samples,
-        genotype_var=genotype_var,
-        pos_var=pos_var,
-        filter_mask=filter_mask,
-    )
-
-    # Locate biallelic SNPs.
-    loc_bi = ac.is_biallelic()
-
     # Set up genotypes
     gt = load_genotype_array(
         zarr_base_path=zarr_base_path,
@@ -271,9 +261,14 @@ def load_biallelic_snp_calls(
         filter_mask=filter_mask,
     )
 
+    ac = gt.count_alleles()
+
+    # Locate biallelic SNPs.
+    loc_bi = ac.is_biallelic()
+
     # Subset to only biallelics
-    gt_bi = gt.compress(loc_bi, axis=1)
-    ac_bi = ac.compress(loc_bi, axis=1)
+    gt_bi = gt.compress(loc_bi, axis=0)
+    ac_bi = ac.compress(loc_bi, axis=0)
 
     # Apply conditions.
     if max_missing_an is not None or min_minor_ac is not None:
@@ -301,7 +296,7 @@ def load_biallelic_snp_calls(
             loc_out &= loc_minor
 
     # Apply conditions
-    gt_bi.compress(loc_out, axis=1)
+    gt_bi = gt_bi.compress(loc_out, axis=0)
 
     # Try to meet target number of SNPs.
     if n_snps is not None:
