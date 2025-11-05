@@ -252,7 +252,7 @@ def plot_pca(
         template="simple_white",
         hover_name="sample_id",
         hover_data=hover_data,
-        alpha=alpha,
+        opacity=alpha,
     )
 
     # Set up PCA data
@@ -274,7 +274,7 @@ def plot_pca(
 
     fig.update_traces(marker=dict(size=10, opacity=0.7))
 
-    fig.show(renderer="iframe")
+    fig.show()
 
     # Save as SVG if you like
     if plotpath is not None:
