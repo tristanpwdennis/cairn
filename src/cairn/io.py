@@ -18,9 +18,12 @@ import pandas as pd
 import numpy as np
 import zarr
 
+from yaspin import yaspin
+
+from cairn.frq import compute_ac
+
 
 # To-Do
-# - Add region support
 # - Add gcs support
 
 
@@ -135,12 +138,13 @@ def _locate_region(region: tuple, pos: np.ndarray) -> slice:
     return loc_region
 
 
+@yaspin(text="Loading genotypes...")
 def load_genotype_array(
     zarr_base_path: str,
     region: str,
     df_samples: pd.DataFrame,
-    genotype_var="calldata/GT",
-    pos_var="variants/POS",
+    genotype_var: str = "calldata/GT",
+    pos_var: str = "variants/POS",
     thin_offset: int = 0,
     n_snps: int = None,
     sample_query: str = None,
@@ -190,7 +194,7 @@ def load_genotype_array(
     z = zarr.open(zarr_base_path.format(contig=genome_location[0]))
 
     # Load genotype data
-    gt = allel.GenotypeChunkedArray(z[f"{genotype_var}"])
+    gt = allel.GenotypeArray(z[f"{genotype_var}"])
 
     # Subset by query, if applicable
     if sample_query is not None:
@@ -225,3 +229,90 @@ def load_genotype_array(
             raise ValueError("Not enough SNPs.")
 
     return gt
+
+
+@yaspin(text="Loading biallelic SNP calls...")
+def load_biallelic_snp_calls(
+    zarr_base_path: str,
+    region: str,
+    df_samples: pd.DataFrame,
+    genotype_var: str = "calldata/GT",
+    pos_var: str = "variants/POS",
+    thin_offset: int = 0,
+    min_minor_ac: int = 1,
+    max_missing_an: int = 1,
+    n_snps: int = None,
+    sample_query: str = None,
+    filter_mask: str = None,
+):
+    """ """
+
+    # Load allele counts
+    ac = compute_ac(
+        zarr_base_path=zarr_base_path,
+        region=region,
+        df_samples=df_samples,
+        genotype_var=genotype_var,
+        pos_var=pos_var,
+        filter_mask=filter_mask,
+    )
+
+    # Locate biallelic SNPs.
+    loc_bi = ac.is_biallelic()
+
+    # Set up genotypes
+    gt = load_genotype_array(
+        zarr_base_path=zarr_base_path,
+        region=region,
+        df_samples=df_samples,
+        genotype_var=genotype_var,
+        pos_var=pos_var,
+        sample_query=sample_query,
+        filter_mask=filter_mask,
+    )
+
+    # Subset to only biallelics
+    gt_bi = gt.compress(loc_bi, axis=1)
+    ac_bi = ac.compress(loc_bi, axis=1)
+
+    # Apply conditions.
+    if max_missing_an is not None or min_minor_ac is not None:
+        loc_out = np.ones(gt_bi.shape[0], dtype=bool)
+        an = ac_bi.sum(axis=1)
+
+        # Apply missingness condition.
+        if max_missing_an is not None:
+            an_missing = (gt_bi.shape[1] * gt_bi.shape[2]) - an
+            if isinstance(max_missing_an, float):
+                an_missing_frac = an_missing / an
+                loc_missing = an_missing_frac <= max_missing_an
+            else:
+                loc_missing = an_missing <= max_missing_an
+            loc_out &= loc_missing
+
+        # Apply minor allele count condition.
+        if min_minor_ac is not None:
+            ac_minor = ac_bi.min(axis=1)
+            if isinstance(min_minor_ac, float):
+                ac_minor_frac = ac_minor / an
+                loc_minor = ac_minor_frac >= min_minor_ac
+            else:
+                loc_minor = ac_minor >= min_minor_ac
+            loc_out &= loc_minor
+
+    # Apply conditions
+    gt_bi.compress(loc_out, axis=1)
+
+    # Try to meet target number of SNPs.
+    if n_snps is not None:
+        # Try to meet target number of SNPs.
+        if gt_bi.shape[0] > (n_snps):
+            # Apply thinning.
+            thin_step = gt_bi.shape[0] // n_snps
+            loc_thin = slice(thin_offset, None, thin_step)
+            gt_bi = gt_bi[loc_thin]
+
+        elif gt_bi.shape[0] < n_snps:
+            raise ValueError("Not enough SNPs.")
+
+    return gt_bi
