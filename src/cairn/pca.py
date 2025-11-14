@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 
-from cairn.io import load_biallelic_snp_calls
+from cairn.snps import load_biallelic_snp_calls
 
 from typing import Union
 

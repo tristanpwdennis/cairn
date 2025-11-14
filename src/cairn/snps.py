@@ -263,51 +263,42 @@ def load_biallelic_snp_calls(
 
     ac = gt.count_alleles()
 
-    # Locate biallelic SNPs.
-    loc_bi = ac.is_biallelic()
+    mask = None  # Start with initial mask of none, then build filter mask as optional conditions are applied.
 
-    # Subset to only biallelics
-    gt_bi = gt.compress(loc_bi, axis=0)
-    ac_bi = ac.compress(loc_bi, axis=0)
+    # Apply biallelic filter
+    biallelic_mask = ac.is_biallelic()
+    mask = biallelic_mask if mask is None else mask & biallelic_mask
 
-    # Apply conditions.
-    if max_missing_an is not None or min_minor_ac is not None:
-        loc_out = np.ones(gt_bi.shape[0], dtype=bool)
-        an = ac_bi.sum(axis=1)
+    # Apply segregating filter
+    segregating_mask = ac.is_segregating()
+    mask = segregating_mask if mask is None else mask & segregating_mask
 
-        # Apply missingness condition.
-        if max_missing_an is not None:
-            an_missing = (gt_bi.shape[1] * gt_bi.shape[2]) - an
-            if isinstance(max_missing_an, float):
-                an_missing_frac = an_missing / an
-                loc_missing = an_missing_frac <= max_missing_an
-            else:
-                loc_missing = an_missing <= max_missing_an
-            loc_out &= loc_missing
-
+    # Apply minor allele count filter
+    if min_minor_ac is not None:
+        an = ac.sum(axis=1)
         # Apply minor allele count condition.
-        if min_minor_ac is not None:
-            ac_minor = ac_bi.min(axis=1)
-            if isinstance(min_minor_ac, float):
-                ac_minor_frac = ac_minor / an
-                loc_minor = ac_minor_frac >= min_minor_ac
-            else:
-                loc_minor = ac_minor >= min_minor_ac
-            loc_out &= loc_minor
+        ac_minor = ac[:, 1:].sum(axis=1)
+        if isinstance(min_minor_ac, float):
+            ac_minor_frac = ac_minor / an
+            loc_minor_mask = ac_minor_frac >= min_minor_ac
+        else:
+            loc_minor_mask = ac_minor >= min_minor_ac
+        mask = loc_minor_mask if mask is None else mask & loc_minor_mask
 
-    # Apply conditions
-    gt_bi = gt_bi.compress(loc_out, axis=0)
+    # Apply all filters at once
+    if mask is not None:
+        gt = gt.compress(mask)
 
     # Try to meet target number of SNPs.
     if n_snps is not None:
         # Try to meet target number of SNPs.
-        if gt_bi.shape[0] > (n_snps):
+        if gt.shape[0] > (n_snps):
             # Apply thinning.
-            thin_step = gt_bi.shape[0] // n_snps
+            thin_step = gt.shape[0] // n_snps
             loc_thin = slice(thin_offset, None, thin_step)
-            gt_bi = gt_bi[loc_thin]
+            gt = gt[loc_thin]
 
-        elif gt_bi.shape[0] < n_snps:
+        elif gt.shape[0] < n_snps:
             raise ValueError("Not enough SNPs.")
 
-    return gt_bi
+    return gt
