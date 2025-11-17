@@ -113,7 +113,7 @@ def run_pca(
     data_path = f"{cache_path}/pca_v1/{results_key}-data.csv"
     evr_path = f"{cache_path}/pca_v1/{results_key}-evr.npy"
 
-    if overwrite is None:
+    if overwrite is False:
         try:
             data = pd.read_csv(data_path)
             evr = np.load(evr_path)

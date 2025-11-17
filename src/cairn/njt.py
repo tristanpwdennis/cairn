@@ -8,13 +8,23 @@ This module provides modules for computing and plotting
 NJTs on genomic data.
 
 """
-
-import pandas as pd
-import numpy as np
-import anjl
-import numba
-from scipy.spatial.distance import squareform  # type: ignore
 import allel
+import anjl
+import hashlib
+from itertools import cycle
+import json
+import os
+import numpy as np
+import numba
+import pandas as pd
+import plotly.express as px
+from scipy.spatial.distance import squareform  # type: ignore
+
+from cairn.snps import load_genotype_array
+
+from typing import Union
+
+from yaspin import yaspin
 
 # Hashing function
 def hash_params(*args, **kwargs):
@@ -145,10 +155,16 @@ def infer_njt(
     # Define paths for distance matrices.
     njt_path = f"{cache_path}/njt_v1/{results_key}-njt.npy"
 
-    if overwrite is None:
+    # Subset sample df
+    if sample_query is not None:
+        df = df_samples.query(sample_query)
+    else:
+        df = df_samples
+
+    if overwrite is False:
         try:
             njt = np.load(njt_path)
-            return dmat
+            return njt, df
         except FileNotFoundError:
             pass  # fall through to running analysis
 
@@ -166,12 +182,6 @@ def infer_njt(
             filter_mask=filter_mask,
         )
 
-
-    # Subset sample df
-    if sample_query is not None:
-        df = df_samples.query(sample_query)
-    else:
-        df = df_samples
 
     # Prepare distance matrix
     gn = g.to_n_alt()
@@ -191,23 +201,24 @@ def infer_njt(
     )
 
     # Write output to cache
-    os.makedirs(os.path.dirname(data_path), exist_ok=True)
-    njt.to_csv(njt_path, index=False)
-    np.save(njt_path, evr)
+    os.makedirs(os.path.dirname(njt_path), exist_ok=True)
+    np.save(njt_path, njt)
     print(f"saved results: {results_key}")
 
-    return df, njt
+    return njt, df
 
 
 def plot_njt(
         njt : np.array,
         metadata : pd.DataFrame,
-        hover_data : list,
-        colour : str,
-        colour_map : dict,
-        output_path : str,
+        hover_data : list = None,
+        colour : str = None,
+        width: int = 800,
+        height: int = 600,
+        colour_map : dict = None,
+        output_path : str = None,
+        color_discrete_map : dict = None,
     ):
-
 
     # TO-DO: abstract common plotting functionality into utils
     
@@ -218,11 +229,11 @@ def plot_njt(
         return None, None, None
 
     # Throw error if we can't find the data in the metadata.
-    if colour not in data.columns:
+    if colour not in metadata.columns:
         raise ValueError(f"{colour!r} is not a known column in the data.")
 
     # Get factor levels (ever the R programmer) of colour col.
-    color_data_unique_values = data[colour].unique()
+    color_data_unique_values = metadata[colour].unique()
 
     # Now set up color choices.
     if color_discrete_map is None:
@@ -246,7 +257,7 @@ def plot_njt(
         color=colour,
         color_discrete_map=color_discrete_map_prepped,
         hover_data=hover_data,
-        opacity=alpha,
+        #opacity=alpha,
     )
     
     # Plot
