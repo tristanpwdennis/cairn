@@ -45,13 +45,12 @@ def run_pca(
     pos_var: str = "variants/POS",
     cache_path: str = os.getcwd(),
     n_components: int = 10,
-    min_minor_ac: Union[int, float] = 1,
-    max_missing_an: int = 1,
     thin_offset: int = 0,
     n_snps: int = None,
     sample_query: str = None,
     filter_mask: str = None,
     analysis_name: str = None,
+    overwrite: bool = False,
 ):
     """
     Compute principal component analysis (PCA) on a chromosome or genomic region. Optionally apply random SNP thinning and subsetting by samples. Returns a pd DataFrame of PCA and metadata, and an np.array of the explained variance ratio (evr) of each PC.
@@ -65,7 +64,7 @@ def run_pca(
     df_samples : pandas DataFrame
         Sample metadata.
     genotype_var : str
-        Path to the genotype data within the zarr store.
+        Path to the genotype data within the zarr store. Defaults to 'calldata/GT'.
     pos_var : str
         Path to the variant position within the zarr store. Defaults to 'variants/POS'.
     cache_path : str
@@ -82,6 +81,8 @@ def run_pca(
         Path of a boolean filter mask variable in the zarr store. Optional.
     analysis_name : str
         Name of analysis if you want to save separate analysis caches. Optional.
+    overwrite : bool
+        Overwrite existing hash (e.g. if underlying data have changed). Optional.
         
     Returns
     -------
@@ -112,14 +113,13 @@ def run_pca(
     data_path = f"{cache_path}/pca_v1/{results_key}-data.csv"
     evr_path = f"{cache_path}/pca_v1/{results_key}-evr.npy"
 
-    try:
-        # Try to load previously generated results
-        data = pd.read_csv(data_path)
-        evr = np.load(evr_path)
-        return data, evr
-    except FileNotFoundError:
-        # No previous results available, need to run analysis
-        print(f"running analysis: {results_key}")
+    if overwrite is None:
+        try:
+            data = pd.read_csv(data_path)
+            evr = np.load(evr_path)
+            return data, evr
+        except FileNotFoundError:
+            pass  # fall through to running analysis
 
     # Prepare inputs
     with yaspin("Preparing input matrix..."):
