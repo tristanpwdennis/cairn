@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 
-from cairn.snps import load_biallelic_snp_calls
+from cairn.snps import load_genotype_array
 
 from typing import Union
 
@@ -72,14 +72,6 @@ def run_pca(
         Path to cache for storing results hashes.
     n_components: int
         Number of principal components to compute.
-    is_biallelic: bool
-        Toggle whether to select biallelic only sites. Optional. Defaults to True.
-    is_segregating: bool
-        Toggle whether to select segregating only sites. Optional. Defaults to True.
-    min_minor_ac: int / float.
-        Filter on minor allele count. If float, will filter on frequency (fraction). Defaults to 1.
-    max_missing_an: int
-        Min number of missing individuals at a given site. Defaults to 1.
     thin_offset: int
         Starting index for SNP thinning. Change this to repeat the analysis using a different set of SNPs. Optional.
     sample_query : str
@@ -90,6 +82,7 @@ def run_pca(
         Path of a boolean filter mask variable in the zarr store. Optional.
     analysis_name : str
         Name of analysis if you want to save separate analysis caches. Optional.
+        
     Returns
     -------
     "df_pca", "evr"
@@ -109,7 +102,6 @@ def run_pca(
     results_key = hash_params(
         contig=region,
         sample_query=sample_query,
-        min_minor_ac=min_minor_ac,
         n_snps=n_snps,
         n_components=n_components,
         analysis_name=analysis_name,
@@ -131,21 +123,32 @@ def run_pca(
 
     # Prepare inputs
     with yaspin("Preparing input matrix..."):
-        g = load_biallelic_snp_calls(
+        g = load_genotype_array(
             zarr_base_path=zarr_base_path,
             region=region,
             df_samples=df_samples,
             genotype_var=genotype_var,
             pos_var=pos_var,
             sample_query=sample_query,
-            min_minor_ac=min_minor_ac,
-            max_missing_an=max_missing_an,
-            n_snps=n_snps,
             filter_mask=filter_mask,
         )
 
-        gn = g.to_n_alt()
+        ac = g.count_alleles() #Count alleles
+        flt = (ac.max_allele() == 1) & (ac[:, :2].min(axis=1) > 1) # Remove singletons and multiallelics
+        gn = g.compress(flt, axis=0).to_n_alt() #Apply filter
 
+        # Thin
+        if n_snps is not None:
+            # Try to meet target number of SNPs.
+            if gn.shape[0] > (n_snps):
+                # Apply thinning.
+                thin_step = gn.shape[0] // n_snps
+                loc_thin = slice(thin_offset, None, thin_step)
+                gn = gn[loc_thin]
+    
+            elif gn.shape[0] < n_snps:
+                raise ValueError("Not enough SNPs.")
+        
     # Subset sample df
     if sample_query is not None:
         df = df_samples.query(sample_query)
