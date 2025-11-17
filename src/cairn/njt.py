@@ -262,7 +262,7 @@ def plot_njt(
     
     # Plot
     nj_2 = anjl.plot(
-                Z=Z,
+                Z=njt,
                 leaf_data=metadata,
                 **plot_kwargs
                 )
