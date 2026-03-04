@@ -8,48 +8,32 @@ Useful bits and pieces
 
 from __future__ import annotations
 
-from typing import Union
 
 import allel
+import hashlib
+from itertools import cycle
+import json
+import numba
 import numpy as np
+import pandas as pd
+import plotly.express as px
+import seaborn as sns
 
 
-def select_random_elements_sorted(
-    arr: Union[np.ndarray],
-    n: int,
-    replace: bool = False,
-    seed: int | None = None,
-    return_indices: bool = False,
-):
+def thin_array(arr, n_snps: int, thin_offset: int = 0):
     """
-    Select random rows from a 2D array (or xarray), returned in sorted order.
-
-    Parameters
-    ----------
-    arr : array-like of shape (n_rows, n_features)
-        Input array or matrix from which to sample rows.
-    n : int
-        Number of rows to select.
-    replace : bool, optional
-        Whether to sample with replacement. Default is False.
-    seed : int, optional
-        Random seed for reproducibility. Default is None.
-    return_indices : bool, optional
-        If True, also return the selected indices. Default is False.
+    Thin an array to the approximate number of SNPs. Adding a thin offset allows you to to repeat the analysis
+    using a different set of SNPs.
     """
+    if n_snps is None:
+        return arr
+    if arr.shape[0] < n_snps:
+        raise ValueError("Not enough SNPs.")
+    if arr.shape[0] == n_snps:
+        return arr
+    step = arr.shape[0] // n_snps
 
-    rng = np.random.default_rng(seed)
-    n_rows = arr.shape[0]
-
-    if not replace and n > n_rows:
-        raise ValueError(
-            f"Cannot sample {n} rows without replacement from {n_rows} total."
-        )
-
-    indices = np.sort(rng.choice(n_rows, size=n, replace=replace))
-
-    sampled = arr[indices]
-    return (sampled, indices) if return_indices else sampled
+    return arr[slice(thin_offset, None, step)]
 
 
 def parse_region(region_str: str) -> tuple:
@@ -100,7 +84,8 @@ def parse_region(region_str: str) -> tuple:
 
 
 def locate_region(region: tuple, pos: np.ndarray) -> slice:
-    """Get array slice and a parsed genomic region.
+    """
+    Get array slice and a parsed genomic region.
 
     Parameters
     ----------
@@ -123,3 +108,71 @@ def locate_region(region: tuple, pos: np.ndarray) -> slice:
         # There are no data within the requested region, return a zero-length slice.
         loc_region = slice(0, 0)
     return loc_region
+
+
+def prepare_discrete_colour_palette(data: pd.DataFrame, color: str) -> dict:
+    """
+    Prepare a dictionary of colors based on a dataframe and a column value.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        A dataframe containing the values to be plotted / coloured.
+    color : str
+        The name of the column containing the values to be mapped to colours.
+    """
+
+    # Throw error if we can't find the data in the metadata.
+    if color not in data.columns:
+        raise ValueError(f"{color!r} is not a known column in the data.")
+
+    # Get factor levels (ever the R programmer) of colour col.
+    color_data_unique_values = data[color].unique()
+
+    # Now set up color choices.
+    if len(color_data_unique_values) <= 12:
+        color_discrete_map = list(
+            sns.color_palette("Paired", n_colors=len(color_data_unique_values)).as_hex()
+        )
+    else:
+        color_discrete_map = px.colors.qualitative.Alphabet
+
+    # Map values to colors.
+    color_discrete_map_prepped = {
+        v: c
+        for v, c in zip(
+            color_data_unique_values, cycle(color_discrete_map), strict=False
+        )
+    }
+
+    return color_discrete_map_prepped
+
+
+def hash_params(*args, **kwargs):
+    """Helper function to hash analysis parameters."""
+    o = {"args": args, "kwargs": kwargs}
+    s = json.dumps(o, sort_keys=True).encode()
+    h = hashlib.md5(s).hexdigest()
+    return h
+
+
+@numba.njit
+def hash_columns(x):
+    # Here we want to compute a hash for each column in the
+    # input array. However, we assume the input array is in
+    # C contiguous order, and therefore we scan the array
+    # and perform the computation in this order for more
+    # efficient memory access.
+    #
+    # This function uses the DJBX33A hash function which
+    # is much faster than computing Python hashes of
+    # bytes, as discovered by Tom White in work on sgkit.
+    m = x.shape[0]
+    n = x.shape[1]
+    out = np.empty(n, dtype=np.int64)
+    out[:] = 5381
+    for i in range(m):
+        for j in range(n):
+            v = x[i, j]
+            out[j] = out[j] * 33 + v
+    return out
