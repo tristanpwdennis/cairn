@@ -6,7 +6,7 @@ Author: Tristan Dennis; tristanpwdennis@gmail.com
 License: MIT
 Project-URL: Homepage, https://github.com/tristanpwdennis/cairn
 Project-URL: Issues, https://github.com/tristanpwdennis/cairn/issues
-Requires-Python: >=3.11
+Requires-Python: <3.12,>=3.10
 Description-Content-Type: text/markdown
 Requires-Dist: scikit-allel
 Requires-Dist: anjl
@@ -35,6 +35,12 @@ Requires-Dist: pre-commit; extra == "dev"
 Packages like [sgkit](https://pystatgen.github.io/sgkit/) and [scikit-allel](https://scikit-allel.readthedocs.io/) provide excellent functionality for genome analysis. *Cairn* adds lightweight utilities and convenience wrappers for my own workflows — typically involving large Zarr arrays of genotype and variant data.
 
 All functionality currently runs locally, with planned extensions for parallel computation on **Dask clusters** managed by **SLURM** or **Kubernetes**.
+
+TO-DO:
+- Add support for GCS.
+- " Dask.
+- Add spinners for everything. I love spinners.
+
 
 ## Naming
 
