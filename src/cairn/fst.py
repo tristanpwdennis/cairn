@@ -220,4 +220,4 @@ def fst_average(
     
     print(f'saved results: {results_key}')
 
-    return (fst, x)
+    return (fst, se)
