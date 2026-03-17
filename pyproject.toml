@@ -13,15 +13,16 @@ authors = [
 ]
 requires-python = ">=3.10,<3.12"
 dependencies = [
-  "scikit-allel",
+  "scikit-allel==1.3.13",
   "anjl",
-  "zarr",
+  "zarr==2.18.7",
   "xarray",
   "plotly",
   "seaborn",
   "numpy",
   "pandas",
   "google",
+  "numcodecs==0.15.1",
   "gcsfs",
   "scipy",
   "cartopy",
