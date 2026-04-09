@@ -157,9 +157,9 @@ def infer_njt(
 
     # Subset sample df
     if sample_query is not None:
-        df = df_samples.query(sample_query)
+        df = df_samples.query(sample_query).reset_index(drop=True)
     else:
-        df = df_samples
+        df = df_samples.reset_index(drop=True)
 
     if overwrite is False:
         try:
@@ -242,13 +242,15 @@ def plot_njt(
         else:
             color_discrete_sequence = px.colors.qualitative.Alphabet
 
-    # Map values to colors.
-    color_discrete_map_prepped = {
-        v: c
-        for v, c in zip(
-            color_data_unique_values, cycle(color_discrete_sequence), strict=False
-        )
-    }
+        # Map values to colors.
+        color_discrete_map_prepped = {
+            v: c
+            for v, c in zip(
+                color_data_unique_values, cycle(color_discrete_sequence), strict=False
+            )
+        }
+    else:
+        color_discrete_map_prepped = color_discrete_map
 
     # Set up plot kwargs
     plot_kwargs = dict(
