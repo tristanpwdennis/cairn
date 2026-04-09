@@ -157,9 +157,9 @@ def infer_njt(
 
     # Subset sample df
     if sample_query is not None:
-        df = df_samples.query(sample_query)
+        df = df_samples.query(sample_query).reset_index(drop=True)
     else:
-        df = df_samples
+        df = df_samples.reset_index(drop=True)
 
     if overwrite is False:
         try:
